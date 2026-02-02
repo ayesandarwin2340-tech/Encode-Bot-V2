@@ -1,23 +1,60 @@
-import base64, zlib, marshal, os, tempfile, random, string, asyncio, json, hashlib, time, re
+import base64, zlib, marshal, os, tempfile, random, string, asyncio, json, hashlib, time, re, sys
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
 
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    InputFile
-)
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-    filters
-)
-from telegram.constants import ParseMode
+# First check the telegram version
+try:
+    import telegram
+    print(f"python-telegram-bot version detected: {telegram.__version__}")
+    
+    if telegram.__version__.startswith('20.'):
+        # Version 20.x - Modern API
+        from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
+        from telegram.ext import (
+            Application,
+            CommandHandler,
+            MessageHandler,
+            CallbackQueryHandler,
+            ContextTypes,
+            filters
+        )
+        from telegram.constants import ParseMode
+        print("Using v20.x API")
+        BOT_VERSION = 20
+        
+    elif telegram.__version__.startswith('13.'):
+        # Version 13.x - Legacy API
+        from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, ParseMode
+        from telegram.ext import (
+            Updater,
+            CommandHandler,
+            MessageHandler,
+            CallbackQueryHandler,
+            Filters,
+            CallbackContext
+        )
+        print("Using v13.x API")
+        BOT_VERSION = 13
+        
+    else:
+        print(f"Unknown version: {telegram.__version__}, trying v20.x")
+        from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
+        from telegram.ext import (
+            Application,
+            CommandHandler,
+            MessageHandler,
+            CallbackQueryHandler,
+            ContextTypes,
+            filters
+        )
+        from telegram.constants import ParseMode
+        BOT_VERSION = 20
+        
+except ImportError as e:
+    print(f"Error importing telegram: {e}")
+    print("Please install python-telegram-bot: pip install python-telegram-bot")
+    sys.exit(1)
 
 # ======================
 # CONFIG & DATABASE
@@ -875,35 +912,48 @@ If the problem persists, please contact support.
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=main_keyboard()
         )
-
 # ======================
 # MAIN APPLICATION
 # ======================
 def main():
     """Start the bot - Python File Obfuscator Special Edition"""
-    # Create application
-    application = Application.builder().token(BOT_TOKEN).build()
-    
-    # Add handlers - REMOVED TEXT HANDLER
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("stats", stats_command))
-    application.add_handler(CommandHandler("help", help_command))
-    
-    # File handler only - no text handler
-    application.add_handler(MessageHandler(filters.Document.ALL, file_handler))
-    application.add_handler(CallbackQueryHandler(button_handler))
-    
-    # Add error handler
-    application.add_error_handler(error_handler)
-    
-    # Start bot
-    print("=" * 50)
-    print("🤖 Python File Obfuscator Bot")
-    print("📁 Specialized for .py files only")
-    print(f"🕒 Started at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 50)
-    
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        # Create application with proper configuration
+        application = Application.builder() \
+            .token(BOT_TOKEN) \
+            .concurrent_updates(True) \
+            .build()
+        
+        # Add handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("stats", stats_command))
+        application.add_handler(CommandHandler("help", help_command))
+        
+        # File handler only - no text handler
+        application.add_handler(MessageHandler(filters.Document.ALL, file_handler))
+        application.add_handler(CallbackQueryHandler(button_handler))
+        
+        # Add error handler
+        application.add_error_handler(error_handler)
+        
+        # Start bot with proper initialization
+        print("=" * 50)
+        print("🤖 Python File Obfuscator Bot")
+        print("📁 Specialized for .py files only")
+        print(f"🕒 Started at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print("=" * 50)
+        
+        # Run the bot until Ctrl-C is pressed
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+            close_loop=False
+        )
+        
+    except Exception as e:
+        print(f"Failed to start bot: {e}")
+        print("Please check your BOT_TOKEN and dependencies.")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
